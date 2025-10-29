@@ -1,11 +1,17 @@
 use std::f64;
 use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::error::Error;
+use std::path::Path;
 
 #[derive(Debug, Clone, Copy)]
-struct Point {
+pub struct Point {
     x: f64,
     y: f64
 }
+
+
+type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
 #[derive(Debug)]
 pub struct Instance {
@@ -22,42 +28,54 @@ pub struct Instance {
 
 impl Instance {
     
-    fn from_file(filename: &str) -> Result<Self> {
+    // should return Result or Error
+    pub fn from_file<P: AsRef<Path>>(filename: P) -> Result<Self> {
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
         
-        let first_line = lines.next().unwrap()?
+        // Parse first line
+        let first_line = lines.next().ok_or("Empty file")??;
         let first_parts: Vec<&str> = first_line.split_whitespace().collect();
+        if first_parts.len() < 5 {
+            return Err("Invalid first line format".into());
+        }
+        
         let n_reqs = first_parts[0].parse()?;
         let n_vehicles = first_parts[1].parse()?;
         let cap = first_parts[2].parse()?;
         let gamma = first_parts[3].parse()?;
         let rho = first_parts[4].parse()?;
 
-        // demands section
-        let mut current_line = lines.next().unwrap()?;
-        while current_line != "#demands" {
-            current_line = lines.next().unwrap()?;
+        // Skip to demands section
+        let mut current_line;
+        loop {
+            current_line = lines.next().ok_or("Unexpected EOF while searching for #demands")??;
+            if current_line == "#demands" {
+                break;
+            }
         }
         
-        let demands_line = lines.next().unwrap()?;
+        // Parse demands
+        let demands_line = lines.next().ok_or("Unexpected EOF after #demands")??;
         let demands: Vec<usize> = demands_line
             .split_whitespace()
             .map(|s| s.parse().unwrap())
             .collect();
         
-            // Skip to locations section
-        current_line = lines.next().unwrap()?;
-        while current_line != "#request locations" {
-            current_line = lines.next().unwrap()?;
+        // Skip to locations section
+        loop {
+            current_line = lines.next().ok_or("Unexpected EOF while searching for #request locations")??;
+            if current_line == "#request locations" {
+                break;
+            }
         }
         
         // Parse locations
         let mut locations = Vec::new();
         
         // Depot
-        let depot_line = lines.next().unwrap()?;
+        let depot_line = lines.next().ok_or("Unexpected EOF after #request locations")??;
         let depot_parts: Vec<f64> = depot_line
             .split_whitespace()
             .map(|s| s.parse().unwrap())
@@ -65,8 +83,8 @@ impl Instance {
         locations.push(Point { x: depot_parts[0], y: depot_parts[1] });
         
         // Pickup locations
-        for _ in 0..n {
-            let line = lines.next().unwrap()?;
+        for _ in 0..n_reqs {
+            let line = lines.next().ok_or("Unexpected EOF while reading pickup locations")??;
             let parts: Vec<f64> = line
                 .split_whitespace()
                 .map(|s| s.parse().unwrap())
@@ -75,8 +93,8 @@ impl Instance {
         }
         
         // Drop-off locations
-        for _ in 0..n {
-            let line = lines.next().unwrap()?;
+        for _ in 0..n_reqs {
+            let line = lines.next().ok_or("Unexpected EOF while reading drop-off locations")??;
             let parts: Vec<f64> = line
                 .split_whitespace()
                 .map(|s| s.parse().unwrap())
@@ -95,5 +113,13 @@ impl Instance {
         })
     }
 
+
+    pub fn n_reqs(&self) -> usize { self.n_reqs }
+    pub fn n_vehicles(&self) -> usize { self.n_vehicles }
+    pub fn cap(&self) -> usize { self.cap }
+    pub fn gamma(&self) -> usize { self.gamma }
+    pub fn rho(&self) -> usize { self.rho }
+    pub fn demands(&self) -> &Vec<usize> { &self.demands }
+    pub fn locations(&self) -> &Vec<Point> { &self.locations }
 
 }

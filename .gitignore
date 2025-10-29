@@ -1,1 +1,26 @@
-/target
+
+# Generated files
+/target/
+**/*.rs.bk
+
+# Dependencies
+/Cargo.lock
+
+# Environment variables
+.env
+.env.*
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Instance data
+instances/
+data/instances/
+*.instance
