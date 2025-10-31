@@ -25,74 +25,96 @@ pub struct Instance {
     n_vehicles: usize,
     cap: usize,
     gamma: usize,
-    rho: usize,
+    rho: f64,
     demands: Vec<usize>,
     locations: Vec<Point>,
 }
 
 impl Instance {
+
     pub fn from_file(filename: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
 
-        // Parse first line
-        let first_line = lines.next().unwrap()?;
+        let first_line = lines.next().ok_or("Empty file")??;
         let first_parts: Vec<&str> = first_line.split_whitespace().collect();
+        
+        if first_parts.len() < 5 {
+            return Err("First line doesn't contain enough parameters".into());
+        }
+        
         let n_reqs = first_parts[0].parse()?;
         let n_vehicles = first_parts[1].parse()?;
         let cap = first_parts[2].parse()?;
         let gamma = first_parts[3].parse()?;
-        let rho = first_parts[4].parse()?;
+        let rho = first_parts[4].parse()?;  // Now parsing as f64
 
-        // Skip to demands section
-        let mut current_line = lines.next().unwrap()?;
-        while current_line != "#demands" {
-            current_line = lines.next().unwrap()?;
+        // demands
+        let mut current_line = lines.next().ok_or("Missing demands section")??;
+        while current_line != "# demands" {
+            current_line = lines.next().ok_or("Could not find #demands section")??;
         }
 
-        // Parse demands
-        let demands_line = lines.next().unwrap()?;
-        let demands: Vec<usize> = demands_line
+        let demands_line = lines.next().ok_or("No demands data")??;
+        let demands: Result<Vec<usize>, _> = demands_line
             .split_whitespace()
-            .map(|s| s.parse().unwrap())
+            .map(|s| s.parse())
             .collect();
-
-        // Skip to locations section
-        current_line = lines.next().unwrap()?;
-        while current_line != "#request locations" {
-            current_line = lines.next().unwrap()?;
+        let demands = demands?;
+        
+        if demands.len() != n_reqs {
+            return Err(format!("Expected {} demands, got {}", n_reqs, demands.len()).into());
         }
 
-        // Parse locations
-        let mut locations = Vec::new();
+        // locations section
+        let mut current_line = lines.next().ok_or("Missing locations section")??;
+        while current_line != "# request locations" {
+            current_line = lines.next().ok_or("Could not find #request locations section")??;
+        }
 
-        // Depot
-         let depot_line = lines.next().unwrap()?;
+        // Parse locations - depot + n_reqs pickups + n_reqs dropoffs
+        let mut locations = Vec::with_capacity(1 + 2 * n_reqs);
+
+        let depot_line = lines.next().ok_or("Missing depot coordinates")??;
         let depot_parts: Vec<f64> = depot_line
             .split_whitespace()
-            .map(|s| s.parse().unwrap())
-            .collect();
+            .map(|s| s.parse())
+            .collect::<Result<_, _>>()?;
+        if depot_parts.len() != 2 {
+            return Err("Depot coordinates should have 2 values".into());
+        }
         locations.push(Point { x: depot_parts[0], y: depot_parts[1] });
 
-        // Pickup locations
-        for _ in 0..n_reqs {
-            let line = lines.next().unwrap()?;
+        // Pickup locations (n_reqs locations)
+        for i in 0..n_reqs {
+            let line = lines.next().ok_or(format!("Missing pickup location {}", i))??;
             let parts: Vec<f64> = line
                 .split_whitespace()
-                .map(|s| s.parse().unwrap())
-                .collect();
+                .map(|s| s.parse())
+                .collect::<Result<_, _>>()?;
+            if parts.len() != 2 {
+                return Err(format!("Pickup location {} should have 2 values", i).into());
+            }
             locations.push(Point { x: parts[0], y: parts[1] });
         }
 
-        // Drop-off locations
-        for _ in 0..n_reqs {
-            let line = lines.next().unwrap()?;
+        // Drop-off locations (n_reqs locations)
+        for i in 0..n_reqs {
+            let line = lines.next().ok_or(format!("Missing drop-off location {}", i))??;
             let parts: Vec<f64> = line
                 .split_whitespace()
-                .map(|s| s.parse().unwrap())
-                .collect();
+                .map(|s| s.parse())
+                .collect::<Result<_, _>>()?;
+            if parts.len() != 2 {
+                return Err(format!("Drop-off location {} should have 2 values", i).into());
+            }
             locations.push(Point { x: parts[0], y: parts[1] });
+        }
+
+        // Verify we read the expected number of locations
+        if locations.len() != 1 + 2 * n_reqs {
+            return Err(format!("Expected {} locations, got {}", 1 + 2 * n_reqs, locations.len()).into());
         }
 
         Ok(Instance {
@@ -124,7 +146,7 @@ impl Instance {
     pub fn n_vehicles(&self) -> usize { self.n_vehicles }
     pub fn cap(&self) -> usize { self.cap }
     pub fn gamma(&self) -> usize { self.gamma }
-    pub fn rho(&self) -> usize { self.rho }
+    pub fn rho(&self) -> f64 { self.rho }
     pub fn demands(&self) -> &Vec<usize> { &self.demands }
     pub fn locations(&self) -> &Vec<Point> { &self.locations }
 }
