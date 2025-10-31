@@ -31,11 +31,9 @@ impl InstanceReqSize {
 }
 
 fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Result<Vec<Instance>, Box<dyn std::error::Error>> {
-    let base_path = Path::new("../instance");
-    println!("Base path (relative): {:?}", base_path);
+    let base_path = Path::new("../instances");
     let size_folder = size.as_str();
     let dataset_path = base_path.join(size_folder).join(dataset_type);
-    println!("Base path (relative): {:?}", dataset_path);
     
     let mut instances = Vec::new();
     
