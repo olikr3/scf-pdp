@@ -3,12 +3,20 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::error::Error;
 use std::path::Path;
+use std::fmt::{self, Formatter};
 
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
     x: f64,
     y: f64,
+}
+
+impl fmt::Display for Point {
+    
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({:.2}, {:.2})", self.x, self.y)
+    }
 }
 
 #[derive(Debug)]
@@ -60,7 +68,7 @@ impl Instance {
         let mut locations = Vec::new();
 
         // Depot
-        let depot_line = lines.next().unwrap()?;
+         let depot_line = lines.next().unwrap()?;
         let depot_parts: Vec<f64> = depot_line
             .split_whitespace()
             .map(|s| s.parse().unwrap())
@@ -119,4 +127,46 @@ impl Instance {
     pub fn rho(&self) -> usize { self.rho }
     pub fn demands(&self) -> &Vec<usize> { &self.demands }
     pub fn locations(&self) -> &Vec<Point> { &self.locations }
+}
+
+
+impl fmt::Display for Instance {
+
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Instance Summary:")?;
+        writeln!(f, "  Requests: {}", self.n_reqs)?;
+        writeln!(f, "  Vehicles: {}", self.n_vehicles)?;
+        writeln!(f, "  Capacity: {}", self.cap)?;
+        writeln!(f, "  Gamma: {}", self.gamma)?;
+        writeln!(f, "  Rho: {}", self.rho)?;
+        
+        // Demands
+        writeln!(f, "  Demands: [{}]", self.demands.iter()
+            .map(|d| d.to_string())
+            .collect::<Vec<String>>()
+            .join(", "))?;
+        
+        // Locations summary
+        writeln!(f, "  Locations ({} total):", self.locations.len())?;
+        writeln!(f, "    Depot: {}", self.locations[0])?;
+        
+        if self.n_reqs > 0 {
+            // Pickup locations
+            writeln!(f, "    Pickup locations:")?;
+            for i in 1..=self.n_reqs {
+                writeln!(f, "      Request {}: {}", i, self.locations[i])?;
+            }
+            
+            // Drop-off locations
+            writeln!(f, "    Drop-off locations:")?;
+            for i in (self.n_reqs + 1)..(2 * self.n_reqs + 1) {
+                let req_num = i - self.n_reqs;
+                writeln!(f, "      Request {}: {}", req_num, self.locations[i])?;
+            }
+        }
+        
+        
+        Ok(())
+
+    }
 }
