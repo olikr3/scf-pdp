@@ -1,4 +1,4 @@
-use scf_pdp::{Instance, Solution,};
+use scf_pdp::{Instance, Solution};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -30,15 +30,65 @@ impl InstanceReqSize {
     }
 }
 
+fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Result<Vec<Instance>, Box<dyn std::error::Error>> {
+    let base_path = Path::new("../instance");
+    println!("Base path (relative): {:?}", base_path);
+    let size_folder = size.as_str();
+    let dataset_path = base_path.join(size_folder).join(dataset_type);
+    println!("Base path (relative): {:?}", dataset_path);
+    
+    let mut instances = Vec::new();
+    
+    // Read all files in the directory
+    let entries = fs::read_dir(&dataset_path)?;
+    
+    for entry in entries {
+        let entry = entry?;
+        let path = entry.path();
+        
+        // Only process .txt files
+        if path.extension().and_then(|s| s.to_str()) == Some("txt") {
+            println!("Loading instance: {:?}", path);
+            
+            match Instance::from_file(path.to_str().unwrap()) {
+                Ok(instance) => {
+                    instances.push(instance);
+                }
+                Err(e) => {
+                    eprintln!("Failed to load instance {:?}: {}", path, e);
+                }
+            }
+        }
+    }
+    
+    println!("Loaded {} instances from {:?}", instances.len(), dataset_path);
+    Ok(instances)
+}
 
-fn main () {
-    let curr_size_dir_name = InstanceReqSize::Size50;
-    /*
-    need to to something like:
-    for file in filepath.files:
-        curr_file = filepath + curr.file
-        inst = Instance.from_file();
-        det_const = DeterministicConstruction.from_instance()
-    */
-    // let inst = Instance.from_file();
+
+fn main () -> Result<(), Box<dyn std::error::Error>> {
+
+    let size = InstanceReqSize::Size50;
+    
+    println!("Processing size: {}", size.as_str());
+    
+    let train_instances = load_instances_from_folder(&size, "train")?;
+    let test_instances = load_instances_from_folder(&size, "test")?;
+    
+    // Process training instances
+    for (i, instance) in train_instances.iter().enumerate() {
+        println!("=== Training Instance {} ===", i);
+        println!("{}", instance); // Uses Display implementation
+    }
+    
+    // Process test instances
+    for (i, instance) in test_instances.iter().enumerate() {
+        println!("Processing test instance {}: n_reqs={}, n_vehicles={}", 
+                    i, instance.n_reqs(), instance.n_vehicles());
+        
+        //let solution = DeterministicConstruction::from_instance(instance);
+        }
+    
+    Ok(())
+
 }
