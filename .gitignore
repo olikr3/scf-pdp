@@ -19,8 +19,3 @@
 # OS files
 .DS_Store
 Thumbs.db
-
-# Instance data
-instances/
-data/instances/
-*.instance
