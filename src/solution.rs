@@ -19,6 +19,14 @@ impl Solution {
         }
     }
 
+    // for beam search
+    pub fn empty(instance_name: String, num_vehicles: usize) -> Self {
+        Self {
+            instance_name,
+            routes: vec![Vec::new(); num_vehicles], // each vehicle has empty route
+        }
+    }
+
     pub fn from_file(filename: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
