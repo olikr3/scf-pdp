@@ -1,7 +1,6 @@
-use crate::{Instance, Solution, solver::construction::ConstructionHeuristic};
+use crate::{Instance, Solution, Solver};
 
 
-// note to self: i think i need lifetimes here
 pub struct RandomConstruction {
     instance: Instance,
 }
@@ -9,7 +8,21 @@ pub struct RandomConstruction {
 
 impl RandomConstruction {
     
-    fn from_instance(instance: Instance) -> Self {
-        todo!();
+    fn new(instance: Instance) -> Self {
+        Self { instance }
+    }
+
+    fn construct_solution(&self) -> Solution {
+        todo!()
+    }
+}
+
+impl Solver for RandomConstruction {
+    fn solve(&self) -> Solution {
+        self.construct_solution()
+    }
+
+    fn name(&self) -> &str {
+        "Random Solution"
     }
 }
