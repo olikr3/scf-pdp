@@ -70,24 +70,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     let train_instances = load_instances_from_folder(&size, "train")?;
     let test_instances = load_instances_from_folder(&size, "test")?;
-    
-    // training instances
-    for (i, instance) in train_instances.iter().enumerate() {
-        println!("=== Training Instance {} ===", i);
-        println!("{}", instance);
-        
-        println!("Instance name: {}", instance.name());
-    }
-    
-    // test instances
-    for (i, instance) in test_instances.iter().enumerate() {
-        println!("Processing test instance {}: name={}, n_reqs={}, n_vehicles={}", 
-                i, instance.name(), instance.n_reqs(), instance.n_vehicles());
-    }
 
     let current_inst = &train_instances[0];
     let det_solver = DeterministicConstruction::new(current_inst);
     let soln = det_solver.solve();
+    println!("Solution: {}", soln);
+    
     
     Ok(())
 }
