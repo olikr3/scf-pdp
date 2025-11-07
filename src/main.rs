@@ -1,4 +1,4 @@
-use scf_pdp::{Instance, Solution};
+use scf_pdp::{DeterministicConstruction, Instance, Solution, Solver};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -83,9 +83,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for (i, instance) in test_instances.iter().enumerate() {
         println!("Processing test instance {}: name={}, n_reqs={}, n_vehicles={}", 
                 i, instance.name(), instance.n_reqs(), instance.n_vehicles());
-        
-        //let solution = DeterministicConstruction::from_instance(instance);
     }
+
+    let current_inst = &train_instances[0];
+    let det_solver = DeterministicConstruction::new(current_inst);
+    let soln = det_solver.solve();
     
     Ok(())
 }

@@ -1,18 +1,18 @@
 use crate::{Instance, Solution, Solver};
 
-pub struct DeterministicConstruction {
-    instance: Instance,
+pub struct DeterministicConstruction<'a> {
+    instance: &'a Instance,
 }
 
-impl DeterministicConstruction {
-    pub fn new(instance: Instance) -> Self {
+impl<'a> DeterministicConstruction<'a> {
+    pub fn new(instance: &'a Instance) -> Self {
         Self { instance }
     }
 
     /* 
     Simple placeholder construction heuristic: serve first gamma requests
     */
-    fn construct_solution(&self) -> Solution {
+    fn construct_solution(&self) -> Solution<'a> {
         let dist_matrix = self.instance.compute_distance_matrix();
         let n_reqs = self.instance.n_reqs();
         let gamma = self.instance.gamma();
@@ -56,16 +56,12 @@ impl DeterministicConstruction {
             routes.push(vec![0, 0]); // empty route: depot to depot
         }
         
-        Solution::new(self.instance.name().to_string(), routes)
-    }
-
-impl Solver for DeterministicConstruction {
-    fn solve(&self) -> Solution {
-        self.construct_solution()
-    }
-    
-    fn name(&self) -> &str {
-        ""
+        Solution::new(self.instance, routes)
     }
 }
+
+impl<'a> Solver for DeterministicConstruction<'a> {
+    fn solve(&self) -> Solution<'a> {
+        self.construct_solution()
+    }
 }
