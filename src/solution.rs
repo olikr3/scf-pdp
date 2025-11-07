@@ -4,65 +4,67 @@ use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
+use crate::instance::Instance;
+
 #[derive(Debug, Clone)]
-pub struct Solution {
-    pub instance_name: String,
+pub struct Solution<'a> {
+    pub instance: &'a Instance,
     pub routes: Vec<Vec<usize>>,
 }
 
-impl Solution {
-
-    pub fn new(instance_name: String, routes: Vec<Vec<usize>>) -> Self {
+impl<'a> Solution<'a> {
+    pub fn new(instance: &'a Instance, routes: Vec<Vec<usize>>) -> Self {
         Self {
-            instance_name,
+            instance,
             routes,
         }
     }
 
     // for beam search
-    pub fn empty(instance_name: String, num_vehicles: usize) -> Self {
+    pub fn empty(instance: &'a Instance, num_vehicles: usize) -> Self {
         Self {
-            instance_name,
+            instance,
             routes: vec![Vec::new(); num_vehicles], // each vehicle has empty route
         }
     }
 
-    pub fn from_file(filename: &str) -> Result<Self, Box<dyn std::error::Error>> {
-        let file = File::open(filename)?;
-        let reader = BufReader::new(file);
-        let mut lines = reader.lines();
-
-        let instance_name = lines.next().ok_or("Empty solution file")??;
-
-        let mut routes = Vec::new();
-        for line in lines {
-            let line = line?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            
-            let route: Result<Vec<usize>, _> = line
-                .split_whitespace()
-                .map(|s| s.parse())
-                .collect();
-            
-            routes.push(route?);
-        }
-
-        Ok(Solution {
-            instance_name,
-            routes,
-        })
+    pub fn jain_fairness(&self) -> f64 {
+        todo!()
     }
 
+    pub fn objective_function_value(&self) -> f64 {
+        todo!()
+    }
+
+    pub fn total_travel_distance(&self) -> f64 {
+        self.get_route_distances().iter().sum()
+    }
+
+    pub fn get_route_distances(&self) -> Vec<f64> {
+        let dist_matrix = self.instance.compute_distance_matrix();
+        
+        self.routes.iter()
+            .map(|route| {
+                if route.len() < 2 {
+                    return 0.0;
+                }
+                
+                let mut distance = 0.0;
+                for i in 0..route.len() - 1 {
+                    distance += dist_matrix[route[i]][route[i + 1]] as f64;
+                }
+                distance
+            })
+            .collect()
+    }
 
     pub fn to_file(&self, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
         let mut file = File::create(filename)?;
         
-        let clean_name = Path::new(&self.instance_name)
+        let clean_name = Path::new(self.instance.name())
             .file_stem()
             .and_then(|s| s.to_str())
-            .unwrap_or(&self.instance_name);
+            .unwrap_or(self.instance.name());
         writeln!(file, "{}", clean_name)?;
 
         // Write each vehicle's route
@@ -73,16 +75,26 @@ impl Solution {
 
         Ok(())
     }
+
+    // to check if solution is valid
+    pub fn is_valid(&self) -> bool {
+        todo!()
+    }
 }
 
-impl fmt::Display for Solution {
+impl<'a> fmt::Display for Solution<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Solution for instance: {}", self.instance_name)?;
+        writeln!(f, "Solution for instance: {}", self.instance.name())?;
         writeln!(f, "Number of routes: {}", self.routes.len())?;
+        writeln!(f, "Total travel distance: {:.2}", self.total_travel_distance())?;
+        writeln!(f, "Jain fairness: {:.4}", self.jain_fairness())?;
+        writeln!(f, "Objective value: {:.2}", self.objective_function_value())?;
+        writeln!(f, "Valid solution: {}", self.is_valid())?;
         
-        for (i, route) in self.routes.iter().enumerate() {
+        let route_distances = self.get_route_distances();
+        for (i, (route, distance)) in self.routes.iter().zip(route_distances).enumerate() {
             let route_str: Vec<String> = route.iter().map(|x| x.to_string()).collect();
-            writeln!(f, "  Vehicle {}: {}", i + 1, route_str.join(" "))?;
+            writeln!(f, "  Vehicle {} (distance: {:.2}): {}", i + 1, distance, route_str.join(" "))?;
         }
         
         Ok(())

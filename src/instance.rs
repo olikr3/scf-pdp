@@ -5,7 +5,6 @@ use std::error::Error;
 use std::path::Path;
 use std::fmt::{self, Formatter};
 
-
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
     x: f64,
@@ -13,7 +12,6 @@ pub struct Point {
 }
 
 impl fmt::Display for Point {
-    
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "({:.2}, {:.2})", self.x, self.y)
     }
@@ -21,6 +19,7 @@ impl fmt::Display for Point {
 
 #[derive(Debug)]
 pub struct Instance {
+    name: String,
     n_reqs: usize,
     n_vehicles: usize,
     cap: usize,
@@ -31,8 +30,14 @@ pub struct Instance {
 }
 
 impl Instance {
-
     pub fn from_file(filename: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let path = Path::new(filename);
+        
+        let instance_name = path.file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
         let mut lines = reader.lines();
@@ -48,7 +53,7 @@ impl Instance {
         let n_vehicles = first_parts[1].parse()?;
         let cap = first_parts[2].parse()?;
         let gamma = first_parts[3].parse()?;
-        let rho = first_parts[4].parse()?;  // Now parsing as f64
+        let rho = first_parts[4].parse()?;
 
         // demands
         let mut current_line = lines.next().ok_or("Missing demands section")??;
@@ -118,6 +123,7 @@ impl Instance {
         }
 
         Ok(Instance {
+            name: instance_name,
             n_reqs,
             n_vehicles,
             cap,
@@ -142,6 +148,8 @@ impl Instance {
         dist
     }
 
+    // Getters
+    pub fn name(&self) -> &str { &self.name }
     pub fn n_reqs(&self) -> usize { self.n_reqs }
     pub fn n_vehicles(&self) -> usize { self.n_vehicles }
     pub fn cap(&self) -> usize { self.cap }
@@ -151,11 +159,9 @@ impl Instance {
     pub fn locations(&self) -> &Vec<Point> { &self.locations }
 }
 
-
 impl fmt::Display for Instance {
-
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(f, "Instance Summary:")?;
+        writeln!(f, "Instance: {}", self.name)?;
         writeln!(f, "  Requests: {}", self.n_reqs)?;
         writeln!(f, "  Vehicles: {}", self.n_vehicles)?;
         writeln!(f, "  Capacity: {}", self.cap)?;
@@ -187,8 +193,6 @@ impl fmt::Display for Instance {
             }
         }
         
-        
         Ok(())
-
     }
 }

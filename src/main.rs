@@ -31,7 +31,7 @@ impl InstanceReqSize {
 }
 
 fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Result<Vec<Instance>, Box<dyn std::error::Error>> {
-    let base_path = Path::new("../instances");
+    let base_path = Path::new("instances");
     let size_folder = size.as_str();
     let dataset_path = base_path.join(size_folder).join(dataset_type);
     
@@ -63,9 +63,7 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
     Ok(instances)
 }
 
-
-fn main () -> Result<(), Box<dyn std::error::Error>> {
-
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let size = InstanceReqSize::Size50;
     
     println!("Processing size: {}", size.as_str());
@@ -73,20 +71,21 @@ fn main () -> Result<(), Box<dyn std::error::Error>> {
     let train_instances = load_instances_from_folder(&size, "train")?;
     let test_instances = load_instances_from_folder(&size, "test")?;
     
-    // Process training instances
+    // training instances
     for (i, instance) in train_instances.iter().enumerate() {
         println!("=== Training Instance {} ===", i);
-        println!("{}", instance); // Uses Display implementation
+        println!("{}", instance);
+        
+        println!("Instance name: {}", instance.name());
     }
     
-    // Process test instances
+    // test instances
     for (i, instance) in test_instances.iter().enumerate() {
-        println!("Processing test instance {}: n_reqs={}, n_vehicles={}", 
-                    i, instance.n_reqs(), instance.n_vehicles());
+        println!("Processing test instance {}: name={}, n_reqs={}, n_vehicles={}", 
+                i, instance.name(), instance.n_reqs(), instance.n_vehicles());
         
         //let solution = DeterministicConstruction::from_instance(instance);
-        }
+    }
     
     Ok(())
-
 }
