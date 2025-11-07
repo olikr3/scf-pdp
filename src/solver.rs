@@ -1,4 +1,4 @@
-use crate::{Instance, Solution};
+use crate::{Solution};
 
 pub trait Solver {
     /// Solve the instance and return a solution

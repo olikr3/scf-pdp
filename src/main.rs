@@ -1,5 +1,4 @@
-use scf_pdp::{DeterministicConstruction, Instance, Solution, Solver};
-use std::error::Error;
+use scf_pdp::{DeterministicConstruction, Instance, Solver};
 use std::fs;
 use std::path::Path;
 
@@ -69,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Processing size: {}", size.as_str());
     
     let train_instances = load_instances_from_folder(&size, "train")?;
-    let test_instances = load_instances_from_folder(&size, "test")?;
+    let _test_instances = load_instances_from_folder(&size, "test")?;
 
     for i in 0..train_instances.len() {
         let current_inst = &train_instances[i];

@@ -1,7 +1,6 @@
-use std::collections::HashSet;
 use std::fmt;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{Write};
 use std::path::Path;
 
 use crate::instance::Instance;

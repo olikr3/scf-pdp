@@ -1,9 +1,8 @@
 use std::f64;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
-use std::error::Error;
 use std::path::Path;
-use std::fmt::{self, Formatter};
+use std::fmt::{self};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Point {
