@@ -71,10 +71,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let train_instances = load_instances_from_folder(&size, "train")?;
     let test_instances = load_instances_from_folder(&size, "test")?;
 
-    let current_inst = &train_instances[0];
-    let det_solver = DeterministicConstruction::new(current_inst);
-    let soln = det_solver.solve();
-    println!("Solution: {}", soln);
+    for i in 0..train_instances.len() {
+        let current_inst = &train_instances[i];
+        let det_solver = DeterministicConstruction::new(current_inst);
+        let soln = det_solver.solve();
+        println!("Solution: {}", soln);
+    }
     
     
     Ok(())
