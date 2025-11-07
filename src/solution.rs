@@ -29,12 +29,30 @@ impl<'a> Solution<'a> {
     }
 
     pub fn jain_fairness(&self) -> f64 {
-        todo!()
+        let route_distances = self.get_route_distances();
+        let n = route_distances.len();
+        
+        if n == 0 {
+            return 1.0;
+        }
+        
+        let sum_distances: f64 = route_distances.iter().sum();
+        let sum_squared_distances: f64 = route_distances.iter().map(|&d| d * d).sum();
+        
+        if sum_squared_distances == 0.0 {
+            return 1.0;
+        }
+        
+        (sum_distances * sum_distances) / (n as f64 * sum_squared_distances)
     }
 
     pub fn objective_function_value(&self) -> f64 {
-        todo!()
+        let total_distance: f64 = self.total_travel_distance();
+        let jain_fairness = self.jain_fairness();
+        
+        total_distance + self.instance.rho() * (1.0 - jain_fairness)
     }
+    
 
     pub fn total_travel_distance(&self) -> f64 {
         self.get_route_distances().iter().sum()
