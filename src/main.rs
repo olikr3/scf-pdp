@@ -63,11 +63,9 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+
     let size = InstanceReqSize::Size50;
-    
-    println!("Processing size: {}", size.as_str());
-    
-    let train_instances = load_instances_from_folder(&size, "train")?;
+    let train_instances = load_instances_from_folder(&size, "train")?; // note that calling "cargo run" in src does not work - needs to be called in root directory
     let _test_instances = load_instances_from_folder(&size, "test")?;
 
     for i in 0..train_instances.len() {
