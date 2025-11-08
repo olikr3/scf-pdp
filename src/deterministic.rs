@@ -10,70 +10,108 @@ impl<'a> DeterministicConstruction<'a> {
     }
 
     /* 
-    Simple placeholder construction heuristic: serve first gamma requests
+    Simple construction heuristic: serve first gamma requests
     */
     fn construct_solution(&self) -> Solution<'a> {
         let n_reqs = self.instance.n_reqs();
         let gamma = self.instance.gamma();
         let n_vehicles = self.instance.n_vehicles();
         let capacity = self.instance.cap();
-        let rho = self.instance.rho();
-
         let demands = self.instance.demands();
-        let dist = self.instance.compute_distance_matrix();
+        let dist_matrix = self.instance.compute_distance_matrix();
 
-        // Initialize each route starting and ending at the depot later
-        let mut routes: Vec<Vec<usize>> = vec![vec![0]; n_vehicles];
+        // Initialize empty routes (will add depot at start/end later)
+        let mut routes: Vec<Vec<usize>> = vec![Vec::new(); n_vehicles];
         let mut loads = vec![0usize; n_vehicles];
 
-        // Helper closures for node index lookup
-        let pickup = |i: usize| 1 + i;
-        let dropoff = |i: usize| 1 + n_reqs + i;
+        // Helper functions for node indices
+        // In the distance matrix: 
+        // - index 0 = depot
+        // - indices 1..=n_reqs = pickup locations  
+        // - indices n_reqs+1..=2*n_reqs = dropoff locations
+        let pickup_index = |req_id: usize| -> usize { 1 + req_id };
+        let dropoff_index = |req_id: usize| -> usize { 1 + n_reqs + req_id };
 
-        // Small helper to compute route distance
-        let route_distance = |route: &Vec<usize>| -> f64 {
-            let mut d = 0.0;
-            for w in route.windows(2) {
-                d += dist[w[0]][w[1]] as f64;
+        // Helper to compute complete route distance including depot start/end
+        let compute_route_distance = |route: &[usize]| -> f64 {
+            if route.is_empty() {
+                return 0.0;
             }
-            d
+            
+            let mut distance = 0.0;
+            
+            // From depot to first stop
+            distance += dist_matrix[0][route[0]] as f64;
+            
+            // Between stops
+            for i in 0..route.len() - 1 {
+                distance += dist_matrix[route[i]][route[i + 1]] as f64;
+            }
+            
+            // From last stop back to depot
+            distance += dist_matrix[route[route.len() - 1]][0] as f64;
+            
+            distance
         };
 
-        // Compute Jain fairness for a vector of route distances
-        let jain = |dists: &Vec<f64>| -> f64 {
-            let sum: f64 = dists.iter().sum();
-            let sum_sq: f64 = dists.iter().map(|x| x * x).sum();
-            if sum_sq == 0.0 { return 1.0; }
-            (sum * sum) / ((dists.len() as f64) * sum_sq)
+        // Compute Jain fairness for current routes
+        let compute_fairness = |routes: &[Vec<usize>]| -> f64 {
+            let distances: Vec<f64> = routes.iter()
+                .map(|route| compute_route_distance(route))
+                .collect();
+                
+            let sum: f64 = distances.iter().sum();
+            let sum_sq: f64 = distances.iter().map(|d| d * d).sum();
+            let k = distances.len() as f64;
+
+            if sum_sq == 0.0 {
+                1.0
+            } else {
+                (sum * sum) / (k * sum_sq)
+            }
         };
 
-        for req_id in 0..gamma {
+        // Try to assign each of the first gamma requests
+        for req_id in 0..gamma.min(n_reqs) {
             let demand = demands[req_id];
+            let pickup = pickup_index(req_id);
+            let dropoff = dropoff_index(req_id);
 
             let mut best_vehicle = None;
             let mut best_score = f64::INFINITY;
 
+            // Try each vehicle
             for k in 0..n_vehicles {
+                // Check capacity constraint
                 if loads[k] + demand > capacity {
                     continue;
                 }
 
-                // Simulate appending pickup and dropoff
+                // Create test route by adding pickup and dropoff
                 let mut test_route = routes[k].clone();
-                test_route.push(pickup(req_id));
-                test_route.push(dropoff(req_id));
+                test_route.push(pickup);
+                test_route.push(dropoff);
 
-                // Compute new distances for fairness evaluation
-                let mut dists: Vec<f64> = routes
-                    .iter()
-                    .map(|r| route_distance(r))
-                    .collect();
-                dists[k] = route_distance(&test_route);
+                // Compute new distances for all vehicles
+                let mut test_routes = routes.clone();
+                test_routes[k] = test_route;
 
-                let delta_dist = dists[k] - route_distance(&routes[k]);
-                let fairness = jain(&dists);
-
-                let score = delta_dist + rho * (1.0 - fairness);
+                let current_fairness = compute_fairness(&routes);
+                let new_fairness = compute_fairness(&test_routes);
+                
+                let current_distance: f64 = routes.iter()
+                    .map(|r| compute_route_distance(r))
+                    .sum();
+                let new_distance: f64 = test_routes.iter()
+                    .map(|r| compute_route_distance(r))
+                    .sum();
+                
+                let delta_distance = new_distance - current_distance;
+                let delta_fairness = new_fairness - current_fairness;
+                
+                // Objective: minimize total_distance + rho * (1 - fairness)
+                // So we want to minimize: delta_distance - rho * delta_fairness
+                let score = delta_distance - self.instance.rho() * delta_fairness;
 
                 if score < best_score {
                     best_score = score;
@@ -81,28 +119,27 @@ impl<'a> DeterministicConstruction<'a> {
                 }
             }
 
-            // If no feasible vehicle due to capacity, assign to least-loaded fallback
-            let k = best_vehicle.unwrap_or_else(|| {
+            // Assign to best vehicle found, or to first available vehicle as fallback
+            let vehicle = best_vehicle.unwrap_or_else(|| {
+                // Fallback: choose vehicle with smallest current load
                 loads.iter()
                     .enumerate()
                     .min_by_key(|(_, &load)| load)
                     .map(|(idx, _)| idx)
-                    .unwrap()
+                    .unwrap_or(0)
             });
 
-            routes[k].push(pickup(req_id));
-            routes[k].push(dropoff(req_id));
-            loads[k] += demand;
+            // Add pickup and dropoff to the chosen vehicle's route
+            routes[vehicle].push(pickup_index(req_id));
+            routes[vehicle].push(dropoff_index(req_id));
+            loads[vehicle] += demand;
         }
 
-        // End routes with depot
-        for r in routes.iter_mut() {
-            r.push(0);
-        }
-
+        // Note: We don't explicitly add depot to routes since the distance calculation
+        // already accounts for depot start/end. The solution format expects only request locations.
+        
         Solution::new(self.instance, routes)
     }
-
 }
 
 impl<'a> Solver for DeterministicConstruction<'a> {

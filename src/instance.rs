@@ -4,10 +4,10 @@ use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::fmt::{self};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
-    x: f64,
-    y: f64,
+    pub x: f64,
+    pub y: f64,
 }
 
 impl fmt::Display for Point {
@@ -15,6 +15,13 @@ impl fmt::Display for Point {
         write!(f, "({:.2}, {:.2})", self.x, self.y)
     }
 }
+
+// Type-safe indices for different location types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PickupIndex(usize);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DropoffIndex(usize);
 
 #[derive(Debug)]
 pub struct Instance {
@@ -25,7 +32,9 @@ pub struct Instance {
     gamma: usize,
     rho: f64,
     demands: Vec<usize>,
-    locations: Vec<Point>,
+    depot: Point,
+    pickup_locations: Vec<Point>,
+    dropoff_locations: Vec<Point>,
 }
 
 impl Instance {
@@ -54,7 +63,6 @@ impl Instance {
         let gamma = first_parts[3].parse()?;
         let rho = first_parts[4].parse()?;
 
-        // demands
         let mut current_line = lines.next().ok_or("Missing demands section")??;
         while current_line != "# demands" {
             current_line = lines.next().ok_or("Could not find #demands section")??;
@@ -71,14 +79,10 @@ impl Instance {
             return Err(format!("Expected {} demands, got {}", n_reqs, demands.len()).into());
         }
 
-        // locations section
         let mut current_line = lines.next().ok_or("Missing locations section")??;
         while current_line != "# request locations" {
             current_line = lines.next().ok_or("Could not find #request locations section")??;
         }
-
-        // Parse locations - depot + n_reqs pickups + n_reqs dropoffs
-        let mut locations = Vec::with_capacity(1 + 2 * n_reqs);
 
         let depot_line = lines.next().ok_or("Missing depot coordinates")??;
         let depot_parts: Vec<f64> = depot_line
@@ -88,9 +92,9 @@ impl Instance {
         if depot_parts.len() != 2 {
             return Err("Depot coordinates should have 2 values".into());
         }
-        locations.push(Point { x: depot_parts[0], y: depot_parts[1] });
+        let depot = Point { x: depot_parts[0], y: depot_parts[1] };
 
-        // Pickup locations (n_reqs locations)
+        let mut pickup_locations = Vec::with_capacity(n_reqs);
         for i in 0..n_reqs {
             let line = lines.next().ok_or(format!("Missing pickup location {}", i))??;
             let parts: Vec<f64> = line
@@ -100,10 +104,10 @@ impl Instance {
             if parts.len() != 2 {
                 return Err(format!("Pickup location {} should have 2 values", i).into());
             }
-            locations.push(Point { x: parts[0], y: parts[1] });
+            pickup_locations.push(Point { x: parts[0], y: parts[1] });
         }
 
-        // Drop-off locations (n_reqs locations)
+        let mut dropoff_locations = Vec::with_capacity(n_reqs);
         for i in 0..n_reqs {
             let line = lines.next().ok_or(format!("Missing drop-off location {}", i))??;
             let parts: Vec<f64> = line
@@ -113,12 +117,7 @@ impl Instance {
             if parts.len() != 2 {
                 return Err(format!("Drop-off location {} should have 2 values", i).into());
             }
-            locations.push(Point { x: parts[0], y: parts[1] });
-        }
-
-        // Verify we read the expected number of locations
-        if locations.len() != 1 + 2 * n_reqs {
-            return Err(format!("Expected {} locations, got {}", 1 + 2 * n_reqs, locations.len()).into());
+            dropoff_locations.push(Point { x: parts[0], y: parts[1] });
         }
 
         Ok(Instance {
@@ -129,25 +128,46 @@ impl Instance {
             gamma,
             rho,
             demands,
-            locations,
+            depot,
+            pickup_locations,
+            dropoff_locations,
         })
     }
 
     pub fn compute_distance_matrix(&self) -> Vec<Vec<usize>> {
-        let l = self.locations.len();
+        // list of all locations for distance matrix
+        let all_locations = self.all_locations();
+        let l = all_locations.len();
         let mut dist = vec![vec![0usize; l]; l];
 
         for u in 0..l {
             for v in 0..l {
-                let dx = self.locations[u].x - self.locations[v].x;
-                let dy = self.locations[u].y - self.locations[v].y;
+                let dx = all_locations[u].x - all_locations[v].x;
+                let dy = all_locations[u].y - all_locations[v].y;
                 dist[u][v] = dx.hypot(dy).ceil() as usize;
             }
         }
         dist
     }
 
-    // Getters
+    /// Get all locations in order: [depot, pickup_0, pickup_1, ..., dropoff_0, dropoff_1, ...]
+    pub fn all_locations(&self) -> Vec<Point> {
+        let mut all = Vec::with_capacity(1 + 2 * self.n_reqs);
+        all.push(self.depot);
+        all.extend(&self.pickup_locations);
+        all.extend(&self.dropoff_locations);
+        all
+    }
+
+    pub fn location_description(&self, index: usize) -> String {
+        match index {
+            0 => "Depot".to_string(),
+            i if i <= self.n_reqs => format!("Pickup-{}", i),
+            i if i <= 2 * self.n_reqs => format!("Dropoff-{}", i - self.n_reqs),
+            _ => "Invalid".to_string(),
+        }
+    }
+
     pub fn name(&self) -> &str { &self.name }
     pub fn n_reqs(&self) -> usize { self.n_reqs }
     pub fn n_vehicles(&self) -> usize { self.n_vehicles }
@@ -155,7 +175,27 @@ impl Instance {
     pub fn gamma(&self) -> usize { self.gamma }
     pub fn rho(&self) -> f64 { self.rho }
     pub fn demands(&self) -> &Vec<usize> { &self.demands }
-    pub fn locations(&self) -> &Vec<Point> { &self.locations }
+    pub fn depot(&self) -> Point { self.depot }
+    pub fn pickup_locations(&self) -> &Vec<Point> { &self.pickup_locations }
+    pub fn dropoff_locations(&self) -> &Vec<Point> { &self.dropoff_locations }
+    
+    /// Get pickup location for a specific request
+    pub fn pickup_location(&self, request_id: usize) -> Option<Point> {
+        if request_id < self.n_reqs {
+            Some(self.pickup_locations[request_id])
+        } else {
+            None
+        }
+    }
+    
+    /// Get dropoff location for a specific request
+    pub fn dropoff_location(&self, request_id: usize) -> Option<Point> {
+        if request_id < self.n_reqs {
+            Some(self.dropoff_locations[request_id])
+        } else {
+            None
+        }
+    }
 }
 
 impl fmt::Display for Instance {
@@ -174,21 +214,19 @@ impl fmt::Display for Instance {
             .join(", "))?;
         
         // Locations summary
-        writeln!(f, "  Locations ({} total):", self.locations.len())?;
-        writeln!(f, "    Depot: {}", self.locations[0])?;
+        writeln!(f, "  Depot: {}", self.depot)?;
         
         if self.n_reqs > 0 {
             // Pickup locations
-            writeln!(f, "    Pickup locations:")?;
-            for i in 1..=self.n_reqs {
-                writeln!(f, "      Request {}: {}", i, self.locations[i])?;
+            writeln!(f, "  Pickup locations:")?;
+            for i in 0..self.n_reqs {
+                writeln!(f, "    Request {}: {}", i + 1, self.pickup_locations[i])?;
             }
             
             // Drop-off locations
-            writeln!(f, "    Drop-off locations:")?;
-            for i in (self.n_reqs + 1)..(2 * self.n_reqs + 1) {
-                let req_num = i - self.n_reqs;
-                writeln!(f, "      Request {}: {}", req_num, self.locations[i])?;
+            writeln!(f, "  Drop-off locations:")?;
+            for i in 0..self.n_reqs {
+                writeln!(f, "    Request {}: {}", i + 1, self.dropoff_locations[i])?;
             }
         }
         

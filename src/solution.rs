@@ -55,14 +55,29 @@ impl<'a> Solution<'a> {
         
         self.routes.iter()
             .map(|route| {
-                if route.len() < 2 {
+                if route.is_empty() {
                     return 0.0;
                 }
                 
                 let mut distance = 0.0;
+                
+                // Distance from depot to first stop
+                if route[0] != 0 { // if first stop is not depot
+                    distance += dist_matrix[0][route[0]] as f64;
+                }
+                
+                // Distance between consecutive stops
                 for i in 0..route.len() - 1 {
                     distance += dist_matrix[route[i]][route[i + 1]] as f64;
                 }
+                
+                // Distance from last stop back to depot
+                if let Some(&last_stop) = route.last() {
+                    if last_stop != 0 { // if last stop is not depot
+                        distance += dist_matrix[last_stop][0] as f64;
+                    }
+                }
+                
                 distance
             })
             .collect()
@@ -77,10 +92,21 @@ impl<'a> Solution<'a> {
             .unwrap_or(self.instance.name());
         writeln!(file, "{}", clean_name)?;
 
-        // Write each vehicle's route
+        // Write each vehicle's route (only request location indices, no depot)
         for route in &self.routes {
-            let route_str: Vec<String> = route.iter().map(|x| x.to_string()).collect();
-            writeln!(file, "{}", route_str.join(" "))?;
+            if route.is_empty() {
+                writeln!(file)?;
+                continue;
+            }
+            
+            // Filter out depot (index 0) and write only request locations
+            let request_stops: Vec<String> = route
+                .iter()
+                .filter(|&&stop| stop != 0)
+                .map(|stop| stop.to_string())
+                .collect();
+                
+            writeln!(file, "{}", request_stops.join(" "))?;
         }
 
         Ok(())
@@ -90,44 +116,67 @@ impl<'a> Solution<'a> {
         let n_reqs = self.instance.n_reqs();
         let capacity = self.instance.cap();
         let demands = self.instance.demands();
+        let gamma = self.instance.gamma();
 
         // Track which requests are served & by which vehicle
         let mut served_by = vec![None; n_reqs];
+        let mut served_count = 0;
 
-        for route in &self.routes {
+        for (vehicle_id, route) in self.routes.iter().enumerate() {
             let mut load = 0usize;
+            let mut picked_up = vec![false; n_reqs]; // Track pickups within this route
 
             for &node in route {
-                // Vehicle capacity check: load must be valid at all times
-                // If node is a pickup
+                // Skip depot nodes for request tracking (but still important for capacity)
+                if node == 0 {
+                    continue;
+                }
+                
+                // If node is a pickup (indices 1 to n_reqs)
                 if node >= 1 && node <= n_reqs {
                     let req_id = node - 1;
+                    
+                    // Check if request already served by another vehicle
+                    if served_by[req_id].is_some() {
+                        return false;
+                    }
+                    
+                    // Check capacity
+                    if load + demands[req_id] > capacity {
+                        return false;
+                    }
+                    
                     load += demands[req_id];
-                    if load > capacity {
-                        return false;
-                    }
+                    picked_up[req_id] = true;
+                    served_by[req_id] = Some(vehicle_id);
 
-                    // Mark request as beginning to be served
-                    match served_by[req_id] {
-                        None => served_by[req_id] = Some(route.as_ptr()), // track vehicle by pointer
-                        Some(_) => return false, // request assigned twice across vehicles
-                    }
-
-                // If node is a dropoff
+                // If node is a dropoff (indices n_reqs+1 to 2*n_reqs)
                 } else if node > n_reqs && node <= 2 * n_reqs {
-                    let req_id = node - 1 - n_reqs;
-                    // Must have been picked up before being dropped off in this specific route
-                    if served_by[req_id] != Some(route.as_ptr()) {
+                    let req_id = node - n_reqs - 1;
+                    
+                    // Check if pickup happened in this route
+                    if !picked_up[req_id] {
                         return false;
                     }
+                    
+                    // Check if dropoff happens after pickup in the same route
+                    if served_by[req_id] != Some(vehicle_id) {
+                        return false;
+                    }
+                    
                     load -= demands[req_id];
+                    served_count += 1;
                 }
+            }
+            
+            // Final load check - should be zero at the end of route
+            if load != 0 {
+                return false;
             }
         }
 
-        // Count served requests
-        let served_count = served_by.iter().filter(|x| x.is_some()).count();
-        served_count >= self.instance.gamma()
+        // Check if we served at least gamma requests
+        served_count >= gamma
     }
 }
 
@@ -142,8 +191,15 @@ impl<'a> fmt::Display for Solution<'a> {
         
         let route_distances = self.get_route_distances();
         for (i, (route, distance)) in self.routes.iter().zip(route_distances).enumerate() {
-            let route_str: Vec<String> = route.iter().map(|x| x.to_string()).collect();
-            writeln!(f, "  Vehicle {} (distance: {:.2}): {}", i + 1, distance, route_str.join(" "))?;
+            let route_with_depot: Vec<String> = route.iter().map(|x| {
+                if *x == 0 {
+                    "depot".to_string()
+                } else {
+                    self.instance.location_description(*x)
+                }
+            }).collect();
+            writeln!(f, "  Vehicle {} (distance: {:.2}): {}", 
+                     i + 1, distance, route_with_depot.join(" → "))?;
         }
         
         Ok(())
