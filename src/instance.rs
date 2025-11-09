@@ -23,7 +23,7 @@ pub struct PickupIndex(usize);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct DropoffIndex(usize);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Instance {
     name: String,
     n_reqs: usize,
