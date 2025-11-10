@@ -147,3 +147,35 @@ impl<'a> Solver for DeterministicConstruction<'a> {
         self.construct_solution()
     }
 }
+
+
+// utility based heuristic
+impl<'a> DeterministicConstruction<'a> {
+
+    /*
+    uses compute_utility() to rank routes based on a bias towards closeness to depot.
+    then it distributes them uniformly among vehicles.
+     */
+    fn utility_based_construction(&self, instance: &'a Instance) -> Solution {
+        let utils = self.compute_utility();
+        todo!()
+    }
+
+    /*
+    Associates each request with a utility score, defined as follows:
+    u_i = (c_i)/ (distance depot-pickup + pickup-dropoff-distance + distance drop_off-depot
+    That way we bias in favor of routes closer to the depot
+     */
+    fn compute_utility(&self) -> Vec<f64> {
+        
+        let demands = self.instance.demands();
+        let dist = self.instance.compute_distance_matrix();
+        let mut utils: Vec<f64> = vec![];
+
+        for i in 1..dist.len() + 1 {
+            let u_i = (demands[i] / (dist[0][i] + dist[i][i] + dist[i][0])) as f64;
+            utils.push(u_i);
+        }
+        utils
+    }
+}
