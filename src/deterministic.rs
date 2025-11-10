@@ -1,4 +1,5 @@
 use crate::{Instance, Solution, Solver};
+use std::collections::HashMap;
 
 pub struct DeterministicConstruction<'a> {
     instance: &'a Instance,
@@ -156,8 +157,20 @@ impl<'a> DeterministicConstruction<'a> {
     uses compute_utility() to rank routes based on a bias towards closeness to depot.
     then it distributes them uniformly among vehicles.
      */
-    fn utility_based_construction(&self, instance: &'a Instance) -> Solution {
-        let utils = self.compute_utility();
+    pub fn utility_based_construction(&self) -> Solution {
+
+        let mut solution = Solution::empty(self.instance, self.instance.n_vehicles());
+        let index_to_util = self.compute_utility();
+        let mut util_scores: Vec<f64> = index_to_util
+            .into_values()
+            .collect();
+        util_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
+        let mut top_gamma_reqs= vec![];
+        let gamma = self.instance.gamma().min(util_scores.len());
+    
+        for i in 0..gamma {
+            top_gamma_reqs.push(util_scores[i]);
+        }
         todo!()
     }
 
@@ -166,16 +179,33 @@ impl<'a> DeterministicConstruction<'a> {
     u_i = (c_i)/ (distance depot-pickup + pickup-dropoff-distance + distance drop_off-depot
     That way we bias in favor of routes closer to the depot
      */
-    fn compute_utility(&self) -> Vec<f64> {
-        
+    fn compute_utility(&self) -> HashMap<usize, f64> {
         let demands = self.instance.demands();
-        let dist = self.instance.compute_distance_matrix();
-        let mut utils: Vec<f64> = vec![];
-
-        for i in 1..dist.len() + 1 {
-            let u_i = (demands[i] / (dist[0][i] + dist[i][i] + dist[i][0])) as f64;
-            utils.push(u_i);
+        let dist_matrix = self.instance.compute_distance_matrix();
+        let n_reqs = self.instance.n_reqs();
+        
+        let mut utility_scores = HashMap::new();
+        
+        for request_id in 0..n_reqs {
+            let pickup_idx = request_id + 1;
+            let dropoff_idx = request_id + 1 + n_reqs;
+            
+            let depot_to_pickup = dist_matrix[0][pickup_idx] as f64;
+            let pickup_to_dropoff = dist_matrix[pickup_idx][dropoff_idx] as f64;
+            let dropoff_to_depot = dist_matrix[dropoff_idx][0] as f64;
+            
+            let total_distance = depot_to_pickup + pickup_to_dropoff + dropoff_to_depot;
+            
+            // Avoid division by zero
+            let utility = if total_distance > 0.0 {
+                demands[request_id] as f64 / total_distance
+            } else {
+                demands[request_id] as f64
+            };
+            
+            utility_scores.insert(request_id, utility);
         }
-        utils
+        
+        utility_scores
     }
 }
