@@ -12,4 +12,4 @@ pub use solver::Solver;
 pub use deterministic::DeterministicConstruction;
 pub use random::RandomConstruction;
 pub use beam_search::BeamSearch;
-pub use executor;
+pub use executor::Executor;
