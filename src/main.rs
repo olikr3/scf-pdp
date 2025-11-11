@@ -1,4 +1,4 @@
-use scf_pdp::{DeterministicConstruction, Instance, Solver};
+use scf_pdp::{BeamSearch, DeterministicConstruction, Instance, RandomConstruction, Solver};
 use std::fs;
 use std::path::Path;
 
@@ -35,8 +35,6 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
     let dataset_path = base_path.join(size_folder).join(dataset_type);
     
     let mut instances = Vec::new();
-    
-    // Read all files in the directory
     let entries = fs::read_dir(&dataset_path)?;
     
     for entry in entries {
@@ -45,7 +43,7 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
         
         // Only process .txt files
         if path.extension().and_then(|s| s.to_str()) == Some("txt") {
-            println!("Loading instance: {:?}", path);
+            //println!("Loading instance: {:?}", path);
             
             match Instance::from_file(path.to_str().unwrap()) {
                 Ok(instance) => {
@@ -71,8 +69,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for i in 0..train_instances.len() {
         let current_inst = &train_instances[i];
         let det_solver = DeterministicConstruction::new(current_inst);
+        let rand_solver = RandomConstruction::new(current_inst, false);
         let soln = det_solver.solve();
-        println!("Solution: {}", soln);
+        let soln1 = rand_solver.solve();
+        //let soln1 = det_solver.utility_based_construction();
+        let beam_search = BeamSearch::new(current_inst)
+            .with_beam_width(20)
+            .with_max_depth(150);
+        let soln2 = beam_search.solve();
+        println!("Deterministic Solution: {}", soln);
+        println!("Random Solution: {}", soln1);
     }
     
     
