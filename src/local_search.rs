@@ -1,4 +1,4 @@
-use crate::{Instance, Solution};
+use crate::{Instance, Solution, Solver};
 
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -21,7 +21,7 @@ pub enum AcceptanceCriterion {
 
 #[derive(Debug, Clone)]
 pub struct LocalSearchConfig {
-    pub neighborhoods: Vec<Neighborhood>,
+    pub neighborhood: Neighborhood,
     pub step_function: StepFunction,
     pub acceptance: AcceptanceCriterion,
     pub max_iterations: usize,
@@ -32,11 +32,7 @@ pub struct LocalSearchConfig {
 impl Default for LocalSearchConfig {
     fn default() -> Self {
         Self {
-            neighborhoods: vec![
-                Neighborhood::Relocate,
-                Neighborhood::Exchange,
-                Neighborhood::TwoOpt,
-            ],
+            neighborhood: Neighborhood::Exchange,
             step_function: StepFunction::FirstImprovement,
             acceptance: AcceptanceCriterion::ImprovingOnly,
             max_iterations: 1000,
@@ -49,4 +45,34 @@ impl Default for LocalSearchConfig {
 pub struct LocalSearch<'a> {
     instance: &'a Instance,
     config: LocalSearchConfig,
+}
+
+impl <'a> LocalSearch<'a> {
+    
+    fn construct_solution(&self) -> Solution {
+
+        let nborhood = match self.config.neighborhood {
+            Neighborhood::Relocate => self.relocate_nh(),
+            Neighborhood::Exchange => self.exchange_nh(),
+            Neighborhood::TwoOpt => self.two_opt_nh(),
+        };
+
+        Solution::empty(self.instance, self.instance.n_vehicles())
+    }
+
+    fn relocate_nh(&self) -> Solution {
+        todo!()
+    }
+    fn exchange_nh(&self) -> Solution {
+        todo!()
+    }
+    fn two_opt_nh(&self) -> Solution {
+        todo!()
+    }
+}
+
+impl <'a> Solver for LocalSearch<'a> {
+    fn solve(&self) -> Solution {
+        self.construct_solution()
+    }
 }
