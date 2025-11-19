@@ -6,6 +6,7 @@ pub mod random;
 pub mod beam_search;
 pub mod executor;
 pub mod local_search;
+pub mod solver_runtime;
 
 pub use instance::Instance;
 pub use solution::Solution;
@@ -15,3 +16,4 @@ pub use random::RandomConstruction;
 pub use beam_search::BeamSearch;
 pub use executor::Executor;
 pub use local_search::LocalSearch;
+pub use solver_runtime::SolverRuntime;
