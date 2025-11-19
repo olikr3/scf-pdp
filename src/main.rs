@@ -61,7 +61,6 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-
     let size = InstanceReqSize::Size50;
     let train_instances = load_instances_from_folder(&size, "train")?; // note that calling "cargo run" in src does not work - needs to be called in root directory
     let _test_instances = load_instances_from_folder(&size, "test")?;
@@ -73,14 +72,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let soln = det_solver.solve();
         let soln1 = rand_solver.solve();
         //let soln1 = det_solver.utility_based_construction();
-        let beam_search = BeamSearch::new(current_inst)
+        
+        // For BeamSearch, you'll need to clone the instance since BeamSearch now takes ownership
+        let beam_search = BeamSearch::new(current_inst.clone())
             .with_beam_width(20)
             .with_max_depth(150);
         let soln2 = beam_search.solve();
+        
         println!("Deterministic Solution: {}", soln);
         println!("Random Solution: {}", soln1);
+        println!("Beam Search Solution: {}", soln2);
     }
-    
     
     Ok(())
 }

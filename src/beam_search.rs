@@ -9,8 +9,8 @@ enum ReqState {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-struct PartialSolution<'a> {
-    instance: &'a Instance,
+struct PartialSolution {
+    instance: Instance,  // Owned instead of borrowed
     routes: Vec<Vec<usize>>,
     req_states: Vec<ReqState>,
     served_count: usize,
@@ -20,14 +20,14 @@ struct PartialSolution<'a> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct BeamSearch<'a> {
-    instance: &'a Instance,
+pub struct BeamSearch {
+    instance: Instance,  // Owned instead of borrowed
     beam_width: usize,
     max_depth: Option<usize>,
 }
 
-impl<'a> BeamSearch<'a> {
-    pub fn new(instance: &'a Instance) -> Self {
+impl BeamSearch {
+    pub fn new(instance: Instance) -> Self {
         Self {
             instance,
             beam_width: 20, // Increased for better exploration
@@ -45,7 +45,7 @@ impl<'a> BeamSearch<'a> {
         self
     }
 
-    pub fn search(&self) -> Solution<'a> {
+    pub fn search(&self) -> Solution {
         let mut beam = vec![self.initial_state()];
         let dist_matrix = self.instance.compute_distance_matrix();
         let max_depth = self.max_depth.unwrap_or(self.instance.n_reqs() * 4);
@@ -91,9 +91,9 @@ impl<'a> BeamSearch<'a> {
             .unwrap_or_else(|| self.fallback_solution())
     }
 
-    fn initial_state(&self) -> PartialSolution<'a> {
+    fn initial_state(&self) -> PartialSolution {
         PartialSolution {
-            instance: self.instance,
+            instance: self.instance.clone(),
             routes: vec![Vec::new(); self.instance.n_vehicles()],
             req_states: vec![ReqState::Unserved; self.instance.n_reqs()],
             served_count: 0,
@@ -102,7 +102,7 @@ impl<'a> BeamSearch<'a> {
         }
     }
 
-    fn generate_successors(&self, state: &PartialSolution<'a>, dist_matrix: &[Vec<usize>]) -> Vec<PartialSolution<'a>> {
+    fn generate_successors(&self, state: &PartialSolution, dist_matrix: &[Vec<usize>]) -> Vec<PartialSolution> {
         let mut successors = Vec::new();
 
         for vehicle_id in 0..self.instance.n_vehicles() {
@@ -157,7 +157,7 @@ impl<'a> BeamSearch<'a> {
         successors
     }
 
-    fn apply_pickup(&self, state: &PartialSolution<'a>, vehicle_id: usize, req_id: usize) -> Option<PartialSolution<'a>> {
+    fn apply_pickup(&self, state: &PartialSolution, vehicle_id: usize, req_id: usize) -> Option<PartialSolution> {
         let mut new_state = state.clone();
         let pickup_index = 1 + req_id; // pickup locations start at index 1
         
@@ -169,7 +169,7 @@ impl<'a> BeamSearch<'a> {
         Some(new_state)
     }
 
-    fn apply_dropoff(&self, state: &PartialSolution<'a>, vehicle_id: usize, req_id: usize) -> Option<PartialSolution<'a>> {
+    fn apply_dropoff(&self, state: &PartialSolution, vehicle_id: usize, req_id: usize) -> Option<PartialSolution> {
         let mut new_state = state.clone();
         let dropoff_index = 1 + self.instance.n_reqs() + req_id; // dropoff locations after pickups
         
@@ -181,14 +181,14 @@ impl<'a> BeamSearch<'a> {
         Some(new_state)
     }
 
-    fn apply_depot_return(&self, state: &PartialSolution<'a>, vehicle_id: usize) -> Option<PartialSolution<'a>> {
+    fn apply_depot_return(&self, state: &PartialSolution, vehicle_id: usize) -> Option<PartialSolution> {
         let mut new_state = state.clone();
         new_state.routes[vehicle_id].push(0); // 0 represents depot
         
         Some(new_state)
     }
 
-    fn select_best_states(&self, mut states: Vec<PartialSolution<'a>>, dist_matrix: &[Vec<usize>]) -> Vec<PartialSolution<'a>> {
+    fn select_best_states(&self, mut states: Vec<PartialSolution>, dist_matrix: &[Vec<usize>]) -> Vec<PartialSolution> {
         if states.len() <= self.beam_width {
             return states;
         }
@@ -202,7 +202,7 @@ impl<'a> BeamSearch<'a> {
         states.dedup();
 
         // Score all states and take best ones
-        let mut scored_states: Vec<(f64, PartialSolution<'a>)> = states
+        let mut scored_states: Vec<(f64, PartialSolution)> = states
             .into_iter()
             .map(|state| (self.heuristic_score(&state, dist_matrix), state))
             .collect();
@@ -216,7 +216,7 @@ impl<'a> BeamSearch<'a> {
             .collect()
     }
 
-    fn heuristic_score(&self, state: &PartialSolution<'a>, dist_matrix: &[Vec<usize>]) -> f64 {
+    fn heuristic_score(&self, state: &PartialSolution, dist_matrix: &[Vec<usize>]) -> f64 {
         let route_distances: Vec<f64> = state.routes.iter()
             .map(|r| self.compute_route_distance(r, dist_matrix))
             .collect();
@@ -296,7 +296,7 @@ impl<'a> BeamSearch<'a> {
         }
     }
 
-    fn is_feasible(&self, state: &PartialSolution<'a>) -> bool {
+    fn is_feasible(&self, state: &PartialSolution) -> bool {
         for &load in &state.current_loads {
             if load > self.instance.cap() {
                 return false;
@@ -315,7 +315,7 @@ impl<'a> BeamSearch<'a> {
         true
     }
 
-    fn best_complete_solution(&self, beam: &[PartialSolution<'a>], dist_matrix: &[Vec<usize>]) -> Option<Solution<'a>> {
+    fn best_complete_solution(&self, beam: &[PartialSolution], dist_matrix: &[Vec<usize>]) -> Option<Solution> {
         let complete_solutions: Vec<_> = beam.iter()
             .filter(|state| state.served_count >= self.instance.gamma() && self.is_feasible(state))
             .collect();
@@ -327,24 +327,24 @@ impl<'a> BeamSearch<'a> {
         // Find the solution with best objective value
         complete_solutions.iter()
             .min_by(|a, b| {
-                let sol_a = Solution::new(self.instance, a.routes.clone());
-                let sol_b = Solution::new(self.instance, b.routes.clone());
+                let sol_a = Solution::new(a.instance.clone(), a.routes.clone());
+                let sol_b = Solution::new(b.instance.clone(), b.routes.clone());
                 
                 let obj_a = sol_a.objective_function_value();
                 let obj_b = sol_b.objective_function_value();
                 
                 obj_a.partial_cmp(&obj_b).unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|state| Solution::new(self.instance, state.routes.clone()))
+            .map(|state| Solution::new(state.instance.clone(), state.routes.clone()))
     }
 
-    fn fallback_solution(&self) -> Solution<'a> {
-        Solution::empty(self.instance, self.instance.n_vehicles())
+    fn fallback_solution(&self) -> Solution {
+        Solution::empty(self.instance.clone(), self.instance.n_vehicles())
     }
 }
 
-impl<'a> crate::Solver for BeamSearch<'a> {
-    fn solve(&self) -> Solution<'a> {
+impl crate::Solver for BeamSearch {
+    fn solve(&self) -> Solution {
         self.search()
     }
 }

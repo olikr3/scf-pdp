@@ -10,14 +10,13 @@ pub struct RandomConstruction<'a> {
     biased: bool,
 }
 
-
 impl<'a> RandomConstruction<'a> {
     
     pub fn new(instance: &'a Instance, biased: bool) -> Self {
         Self { instance, biased }
     }
 
-    fn construct_solution(&self) -> Solution<'a> {
+    fn construct_solution(&self) -> Solution {
         let mut rng = thread_rng();
         let n_reqs = self.instance.n_reqs();
         let n_vehicles = self.instance.n_vehicles();
@@ -25,7 +24,7 @@ impl<'a> RandomConstruction<'a> {
         let gamma = self.instance.gamma();
         let demands = self.instance.demands().clone();
         
-        let mut solution = Solution::empty(self.instance, n_vehicles);
+        let mut solution = Solution::empty(self.instance.clone(), n_vehicles);
         
         let mut all_requests: Vec<usize> = (0..n_reqs).collect();
         all_requests.shuffle(&mut rng);
@@ -42,7 +41,7 @@ impl<'a> RandomConstruction<'a> {
 
     fn assign_requests_uniform(
         &self,
-        solution: &mut Solution<'a>,
+        solution: &mut Solution,
         selected_requests: &[usize],
         demands: &[usize],
         capacity: usize,
@@ -65,7 +64,7 @@ impl<'a> RandomConstruction<'a> {
             }
             
             // If no vehicle can take it due to capacity, assign to a random vehicle
-            // (this might create invalid solutions, but  validation is handled later)
+            // (this might create invalid solutions, but validation is handled later)
             if !assigned {
                 let vehicle_id = vehicle_order[0];
                 self.assign_request_to_vehicle(vehicle_id, req_id, solution);
@@ -75,7 +74,7 @@ impl<'a> RandomConstruction<'a> {
 
     fn assign_requests_biased(
         &self,
-        solution: &mut Solution<'a>,
+        solution: &mut Solution,
         selected_requests: &[usize],
         demands: &[usize],
         capacity: usize,
@@ -152,7 +151,7 @@ impl<'a> RandomConstruction<'a> {
         &self,
         vehicle_id: usize,
         req_id: usize,
-        solution: &Solution<'a>,
+        solution: &Solution,
         demands: &[usize],
         capacity: usize,
     ) -> bool {
@@ -184,7 +183,7 @@ impl<'a> RandomConstruction<'a> {
         &self,
         vehicle_id: usize,
         req_id: usize,
-        solution: &mut Solution<'a>,
+        solution: &mut Solution,
     ) {
         let pickup_loc = req_id + 1;
         let dropoff_loc = req_id + 1 + self.instance.n_reqs();

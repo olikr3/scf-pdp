@@ -6,13 +6,13 @@ use std::path::Path;
 use crate::instance::Instance;
 
 #[derive(Debug, Clone)]
-pub struct Solution<'a> {
-    pub instance: &'a Instance,
+pub struct Solution {
+    pub instance: Instance,  // Owned instead of borrowed
     pub routes: Vec<Vec<usize>>,
 }
 
-impl<'a> Solution<'a> {
-    pub fn new(instance: &'a Instance, routes: Vec<Vec<usize>>) -> Self {
+impl Solution {
+    pub fn new(instance: Instance, routes: Vec<Vec<usize>>) -> Self {
         Self {
             instance,
             routes,
@@ -20,7 +20,7 @@ impl<'a> Solution<'a> {
     }
 
     // for beam search
-    pub fn empty(instance: &'a Instance, num_vehicles: usize) -> Self {
+    pub fn empty(instance: Instance, num_vehicles: usize) -> Self {
         Self {
             instance,
             routes: vec![Vec::new(); num_vehicles], // each vehicle has empty route
@@ -180,7 +180,7 @@ impl<'a> Solution<'a> {
     }
 }
 
-impl<'a> fmt::Display for Solution<'a> {
+impl fmt::Display for Solution {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Solution for instance: {}", self.instance.name())?;
         writeln!(f, "Number of routes: {}", self.routes.len())?;

@@ -13,7 +13,7 @@ impl<'a> DeterministicConstruction<'a> {
     /* 
     Simple construction heuristic: serve first gamma requests
     */
-    fn construct_solution(&self) -> Solution<'a> {
+    fn construct_solution(&self) -> Solution {
         let n_reqs = self.instance.n_reqs();
         let gamma = self.instance.gamma();
         let n_vehicles = self.instance.n_vehicles();
@@ -139,16 +139,15 @@ impl<'a> DeterministicConstruction<'a> {
         // Note: We don't explicitly add depot to routes since the distance calculation
         // already accounts for depot start/end. The solution format expects only request locations.
         
-        Solution::new(self.instance, routes)
+        Solution::new(self.instance.clone(), routes)
     }
 }
 
 impl<'a> Solver for DeterministicConstruction<'a> {
-    fn solve(&self) -> Solution<'a> {
+    fn solve(&self) -> Solution {
         self.construct_solution()
     }
 }
-
 
 // utility based heuristic
 impl<'a> DeterministicConstruction<'a> {
@@ -158,20 +157,64 @@ impl<'a> DeterministicConstruction<'a> {
     then it distributes them uniformly among vehicles.
      */
     pub fn utility_based_construction(&self) -> Solution {
-
-        let mut solution = Solution::empty(self.instance, self.instance.n_vehicles());
-        let index_to_util = self.compute_utility();
-        let mut util_scores: Vec<f64> = index_to_util
-            .into_values()
+        let n_reqs = self.instance.n_reqs();
+        let gamma = self.instance.gamma().min(n_reqs);
+        let n_vehicles = self.instance.n_vehicles();
+        let capacity = self.instance.cap();
+        let demands = self.instance.demands();
+        
+        let utility_map = self.compute_utility();
+        
+        // Create a sorted list of requests by utility (highest first)
+        let mut requests_with_utility: Vec<(usize, f64)> = utility_map.into_iter().collect();
+        requests_with_utility.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Take top gamma requests
+        let top_gamma_reqs: Vec<usize> = requests_with_utility
+            .into_iter()
+            .take(gamma)
+            .map(|(req_id, _)| req_id)
             .collect();
-        util_scores.sort_by(|a, b| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
-        let mut top_gamma_reqs= vec![];
-        let gamma = self.instance.gamma().min(util_scores.len());
-    
-        for i in 0..gamma {
-            top_gamma_reqs.push(util_scores[i]);
+        
+        // Initialize routes and loads
+        let mut routes: Vec<Vec<usize>> = vec![Vec::new(); n_vehicles];
+        let mut loads = vec![0usize; n_vehicles];
+        
+        // Helper functions for node indices
+        let pickup_index = |req_id: usize| -> usize { 1 + req_id };
+        let dropoff_index = |req_id: usize| -> usize { 1 + n_reqs + req_id };
+        
+        // Distribute requests evenly among vehicles
+        for (i, &req_id) in top_gamma_reqs.iter().enumerate() {
+            let vehicle = i % n_vehicles;
+            let demand = demands[req_id];
+            
+            // Check capacity constraint
+            if loads[vehicle] + demand <= capacity {
+                routes[vehicle].push(pickup_index(req_id));
+                routes[vehicle].push(dropoff_index(req_id));
+                loads[vehicle] += demand;
+            } else {
+                // If capacity exceeded, try to find another vehicle with capacity
+                let mut assigned = false;
+                for v in 0..n_vehicles {
+                    if loads[v] + demand <= capacity {
+                        routes[v].push(pickup_index(req_id));
+                        routes[v].push(dropoff_index(req_id));
+                        loads[v] += demand;
+                        assigned = true;
+                        break;
+                    }
+                }
+                
+                // If no vehicle has capacity, skip this request
+                if !assigned {
+                    continue;
+                }
+            }
         }
-        todo!()
+        
+        Solution::new(self.instance.clone(), routes)
     }
 
     /*
