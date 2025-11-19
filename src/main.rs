@@ -1,4 +1,5 @@
-use scf_pdp::{BeamSearch, DeterministicConstruction, Instance, RandomConstruction, Solver};
+use scf_pdp::{BeamSearch, DeterministicConstruction, Instance, RandomConstruction, Solver, LocalSearch, SolverRuntime};
+use scf_pdp::local_search::LocalSearchConfig;
 use std::fs;
 use std::path::Path;
 
@@ -62,27 +63,37 @@ fn load_instances_from_folder(size: &InstanceReqSize, dataset_type: &str) -> Res
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let size = InstanceReqSize::Size50;
-    let train_instances = load_instances_from_folder(&size, "train")?; // note that calling "cargo run" in src does not work - needs to be called in root directory
-    let _test_instances = load_instances_from_folder(&size, "test")?;
+    let train_instances = load_instances_from_folder(&size, "train")?;
+    let test_instances = load_instances_from_folder(&size, "test")?;
 
-    for i in 0..train_instances.len() {
-        let current_inst = &train_instances[i];
-        let det_solver = DeterministicConstruction::new(current_inst);
-        let rand_solver = RandomConstruction::new(current_inst, false);
-        let soln = det_solver.solve();
-        let soln1 = rand_solver.solve();
-        //let soln1 = det_solver.utility_based_construction();
-        
-        // For BeamSearch, you'll need to clone the instance since BeamSearch now takes ownership
-        let beam_search = BeamSearch::new(current_inst.clone())
-            .with_beam_width(20)
-            .with_max_depth(150);
-        let soln2 = beam_search.solve();
-        
-        println!("Deterministic Solution: {}", soln);
-        println!("Random Solution: {}", soln1);
-        println!("Beam Search Solution: {}", soln2);
-    }
+    // Create runtime
+    let runtime = SolverRuntime::new(train_instances);
+
+    // Run individual solvers
+    println!("=== Running Deterministic Construction ===");
+    let det_solutions = runtime.run_deterministic();
+
+    println!("=== Running Random Construction ===");
+    let rand_solutions = runtime.run_random();
+
+    println!("=== Running Beam Search ===");
+    let beam_solutions = runtime.run_beam_search(20, 150);
+
+    println!("=== Running Local Search ===");
+    let local_solutions = runtime.run_local_search(LocalSearchConfig::default());
+
+    // Or run comparison
+    println!("=== Running Solver Comparison ===");
+    let comparison_results = runtime.run_comparison();
     
+    for (instance_name, det_sol, rand_sol, beam_sol, local_sol) in comparison_results {
+        println!("Instance: {}", instance_name);
+        println!("  Deterministic: {:.2} (valid: {})", det_sol.objective_function_value(), det_sol.is_valid());
+        println!("  Random: {:.2} (valid: {})", rand_sol.objective_function_value(), rand_sol.is_valid());
+        println!("  Beam Search: {:.2} (valid: {})", beam_sol.objective_function_value(), beam_sol.is_valid());
+        println!("  Local Search: {:.2} (valid: {})", local_sol.objective_function_value(), local_sol.is_valid());
+        println!();
+    }
+
     Ok(())
 }
