@@ -8,6 +8,7 @@ pub mod executor;
 pub mod local_search;
 pub mod solver_runtime;
 pub mod vnd;
+pub mod grasp;
 
 pub use instance::Instance;
 pub use solution::Solution;
@@ -23,3 +24,5 @@ pub use local_search::StepFunction;
 pub use local_search::AcceptanceCriterion;
 pub use solver_runtime::SolverRuntime;
 pub use vnd::VND;
+pub use grasp::GRASP;
+pub use grasp::GRASPConfig;
