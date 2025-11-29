@@ -261,7 +261,7 @@ impl<'a> LocalSearch<'a> {
         true
     }
 
-    fn generate_neighbors(&self, current: &Solution) -> Vec<Solution> {
+    pub fn generate_neighbors(&self, current: &Solution) -> Vec<Solution> {
         match self.config.neighborhood {
             Neighborhood::Relocate => self.relocate_nh(current),
             Neighborhood::Exchange => self.exchange_nh(current),
