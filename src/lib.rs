@@ -7,6 +7,7 @@ pub mod beam_search;
 pub mod executor;
 pub mod local_search;
 pub mod solver_runtime;
+pub mod vnd;
 
 pub use instance::Instance;
 pub use solution::Solution;
@@ -16,4 +17,9 @@ pub use random::RandomConstruction;
 pub use beam_search::BeamSearch;
 pub use executor::Executor;
 pub use local_search::LocalSearch;
+pub use local_search::Neighborhood;
+pub use local_search::LocalSearchConfig;
+pub use local_search::StepFunction;
+pub use local_search::AcceptanceCriterion;
 pub use solver_runtime::SolverRuntime;
+pub use vnd::VND;
