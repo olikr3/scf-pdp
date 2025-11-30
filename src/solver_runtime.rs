@@ -79,7 +79,9 @@ impl SolverRuntime {
         if let Some(first_instance) = self.instances.first() {
             let instance_size = first_instance.n_reqs().to_string();
             let results_dir = format!("results/{}", instance_size);
+            let solutions_dir = format!("solutions/{}/{}", instance_size, solver_name);
             fs::create_dir_all(&results_dir).expect("Failed to create results directory");
+            fs::create_dir_all(&solutions_dir).expect("Failed to create solutions directory");
             
             csv_data.push("instance_name,time_seconds,objective_value,jain_fairness,num_vehicles".to_string());
         }
@@ -110,6 +112,26 @@ impl SolverRuntime {
             );
             csv_data.push(csv_row);
             
+            // Write solution file
+            if let Some(first_instance) = self.instances.first() {
+                let instance_size = first_instance.n_reqs().to_string();
+                let solution_filename = format!(
+                    "solutions/{}/{}/{}.sol",
+                    instance_size,
+                    solver_name,
+                    Path::new(instance.name())
+                        .file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or(instance.name())
+                );
+                
+                if let Err(e) = solution.to_file(&solution_filename) {
+                    eprintln!("Failed to write solution file {}: {}", solution_filename, e);
+                } else {
+                    println!("  Solution written to: {}", solution_filename);
+                }
+            }
+            
             solutions.push(solution);
         }
         
@@ -136,7 +158,9 @@ impl SolverRuntime {
         if let Some(first_instance) = self.instances.first() {
             let instance_size = first_instance.n_reqs().to_string();
             let results_dir = format!("results/{}", instance_size);
+            let solutions_dir = format!("solutions/{}/comparison", instance_size);
             fs::create_dir_all(&results_dir).expect("Failed to create results directory");
+            fs::create_dir_all(&solutions_dir).expect("Failed to create solutions directory");
             
             // Add CSV header for comparison
             csv_data.push("instance_name,det_time,det_objective,det_fairness,det_vehicles,rand_time,rand_objective,rand_fairness,rand_vehicles,beam_time,beam_objective,beam_fairness,beam_vehicles,local_time,local_objective,local_fairness,local_vehicles".to_string());
@@ -164,6 +188,33 @@ impl SolverRuntime {
             let local_solver = LocalSearch::new(instance, LocalSearchConfig::default());
             let local_solution = local_solver.solve();
             let local_time = local_start.elapsed().as_secs_f64();
+            
+            // Write solution files for each method
+            if let Some(first_instance) = self.instances.first() {
+                let instance_size = first_instance.n_reqs().to_string();
+                let instance_stem = Path::new(instance.name())
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(instance.name());
+                
+                let methods = [
+                    ("deterministic", &det_solution),
+                    ("random", &rand_solution),
+                    ("beam_search", &beam_solution),
+                    ("local_search", &local_solution),
+                ];
+                
+                for (method_name, solution) in methods {
+                    let solution_filename = format!(
+                        "solutions/{}/comparison/{}_{}.sol",
+                        instance_size, instance_stem, method_name
+                    );
+                    
+                    if let Err(e) = solution.to_file(&solution_filename) {
+                        eprintln!("Failed to write solution file {}: {}", solution_filename, e);
+                    }
+                }
+            }
             
             // Add CSV row for comparison
             let csv_row = format!(
@@ -215,7 +266,9 @@ impl SolverRuntime {
         if let Some(first_instance) = self.instances.first() {
             let instance_size = first_instance.n_reqs().to_string();
             let results_dir = format!("results/{}", instance_size);
+            let solutions_dir = format!("solutions/{}/metaheuristic_comparison", instance_size);
             fs::create_dir_all(&results_dir).expect("Failed to create results directory");
+            fs::create_dir_all(&solutions_dir).expect("Failed to create solutions directory");
             
             // Add CSV header for metaheuristic comparison
             csv_data.push("instance_name,vnd_time,vnd_objective,vnd_fairness,vnd_vehicles,grasp_time,grasp_objective,grasp_fairness,grasp_vehicles,sa_time,sa_objective,sa_fairness,sa_vehicles,local_time,local_objective,local_fairness,local_vehicles".to_string());
@@ -260,6 +313,35 @@ impl SolverRuntime {
             let local_solution = local_solver.solve();
             let local_time = local_start.elapsed().as_secs_f64();
             println!("  Local Search completed in {:.2}s, objective: {:.2}", local_time, local_solution.objective_function_value());
+            
+            // Write solution files for each metaheuristic
+            if let Some(first_instance) = self.instances.first() {
+                let instance_size = first_instance.n_reqs().to_string();
+                let instance_stem = Path::new(instance.name())
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(instance.name());
+                
+                let methods = [
+                    ("vnd", &vnd_solution),
+                    ("grasp", &grasp_solution),
+                    ("simulated_annealing", &sa_solution),
+                    ("local_search", &local_solution),
+                ];
+                
+                for (method_name, solution) in methods {
+                    let solution_filename = format!(
+                        "solutions/{}/metaheuristic_comparison/{}_{}.txt",
+                        instance_size, instance_stem, method_name
+                    );
+                    
+                    if let Err(e) = solution.to_file(&solution_filename) {
+                        eprintln!("Failed to write solution file {}: {}", solution_filename, e);
+                    } else {
+                        println!("  {} solution written to: {}", method_name, solution_filename);
+                    }
+                }
+            }
             
             // Add CSV row for comparison
             let csv_row = format!(
