@@ -13,6 +13,7 @@ pub enum LocalSearchStrategy {
     CompositeNeighborhood,
 }
 
+#[derive(Debug, Clone, Copy)]
 pub struct GRASPConfig {
     pub max_iterations: usize,
     pub time_limit_seconds: u64,
