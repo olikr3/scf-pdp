@@ -9,6 +9,7 @@ pub mod local_search;
 pub mod solver_runtime;
 pub mod vnd;
 pub mod grasp;
+pub mod sim_annealing;
 
 pub use instance::Instance;
 pub use solution::Solution;
@@ -26,3 +27,6 @@ pub use solver_runtime::SolverRuntime;
 pub use vnd::VND;
 pub use grasp::GRASP;
 pub use grasp::GRASPConfig;
+pub use sim_annealing::SimulatedAnnealing;
+pub use sim_annealing::SimulatedAnnealingConfig;
+pub use sim_annealing::SimulatedAnnealingBuilder;

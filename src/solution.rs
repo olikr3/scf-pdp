@@ -33,12 +33,15 @@ impl Solution {
         let sum_sq: f64 = distances.iter().map(|d| d * d).sum();
         let k = distances.len() as f64;
 
-        if sum_sq == 0.0 {
-            return 1.0; // all routes empty → perfectly fair
+        // numeric safety
+        let eps = 1e-12;
+        if sum_sq <= eps {
+            return 1.0; // all routes empty (or numerically zero) → perfectly fair
         }
 
         (sum * sum) / (k * sum_sq)
     }
+
 
     pub fn objective_function_value(&self) -> f64 {
         let dist_sum: f64 = self.get_route_distances().iter().sum();
