@@ -89,8 +89,8 @@ pub struct SolverConfig {
 impl Default for SolverConfig {
     fn default() -> Self {
         Self {
-            run_deterministic: false,
-            run_random: true,
+            run_deterministic: true,
+            run_random: false,
             run_beam_search: false,
             run_local_search: false,
             run_vnd: false,
@@ -269,12 +269,12 @@ fn process_size(size: InstanceReqSize, config: &SolverConfig, process_train: boo
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ========== CONFIGURATION ==========
     
-    let sizes = InstanceReqSize::all();
+    let sizes = InstanceReqSize::small();
     let solver_config = SolverConfig::default();
     
     // Choose whether to process train and/or test sets
     let process_train = true;
-    let process_test = true;
+    let process_test = false;
     
     // ===================================
     
