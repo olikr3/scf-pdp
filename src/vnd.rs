@@ -39,11 +39,11 @@ impl<'a> VND<'a> {
         // Create a local search config for this specific neighborhood
         let config = LocalSearchConfig {
             neighborhood,
-            step_function: StepFunction::BestImprovement,
+            step_function: StepFunction::FirstImprovement,
             acceptance: AcceptanceCriterion::ImprovingOnly,
             max_iterations: 1, // Only one iteration to find best neighbor
             max_no_improvement: 1,
-            time_limit_seconds: 300,
+            time_limit_seconds: 50,
         };
 
         let local_search = LocalSearch::new(self.instance, config);

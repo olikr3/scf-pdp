@@ -36,7 +36,7 @@ impl Default for LocalSearchConfig {
             step_function: StepFunction::FirstImprovement,
             acceptance: AcceptanceCriterion::ImprovingOnly,
             max_iterations: 1000,
-            max_no_improvement: 100,
+            max_no_improvement: 50,
             time_limit_seconds: 60,
         }
     }
