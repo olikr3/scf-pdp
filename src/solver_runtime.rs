@@ -3,7 +3,10 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
 use crate::{BeamSearch, DeterministicConstruction, Instance, Solution, RandomConstruction, Solver, LocalSearch};
-use crate::local_search::LocalSearchConfig;
+use crate::local_search::{LocalSearchConfig, Neighborhood};
+use crate::vnd::VND;
+use crate::grasp::{GRASP, GRASPConfig};
+use crate::sim_annealing::{SimulatedAnnealing, SimulatedAnnealingConfig};
 
 pub struct SolverRuntime {
     instances: Vec<Instance>,
@@ -40,6 +43,28 @@ impl SolverRuntime {
     pub fn run_local_search(&self, config: LocalSearchConfig) -> Vec<Solution> {
         self.run_generic("local_search", |instance| {
             let solver = LocalSearch::new(instance, config.clone());
+            solver.solve()
+        })
+    }
+
+    pub fn run_vnd(&self, neighborhoods: &[Neighborhood], max_iterations: usize) -> Vec<Solution> {
+        self.run_generic("vnd", |instance| {
+            let solver = VND::new(instance, neighborhoods.to_vec())
+                .with_max_iterations(max_iterations);
+            solver.solve()
+        })
+    }
+
+    pub fn run_grasp(&self, config: GRASPConfig) -> Vec<Solution> {
+        self.run_generic("grasp", |instance| {
+            let solver = GRASP::new(instance, config.clone());
+            solver.solve()
+        })
+    }
+
+    pub fn run_simulated_annealing(&self, config: SimulatedAnnealingConfig) -> Vec<Solution> {
+        self.run_generic("simulated_annealing", |instance| {
+            let solver = SimulatedAnnealing::new(instance, config.clone());
             solver.solve()
         })
     }
@@ -147,19 +172,19 @@ impl SolverRuntime {
                 det_time,
                 det_solution.objective_function_value(),
                 det_solution.jain_fairness(),
-                det_solution.routes.len(), // Use routes.len() instead of num_vehicles()
+                det_solution.routes.len(),
                 rand_time,
                 rand_solution.objective_function_value(),
                 rand_solution.jain_fairness(),
-                rand_solution.routes.len(), // Use routes.len() instead of num_vehicles()
+                rand_solution.routes.len(),
                 beam_time,
                 beam_solution.objective_function_value(),
                 beam_solution.jain_fairness(),
-                beam_solution.routes.len(), // Use routes.len() instead of num_vehicles()
+                beam_solution.routes.len(),
                 local_time,
                 local_solution.objective_function_value(),
                 local_solution.jain_fairness(),
-                local_solution.routes.len() // Use routes.len() instead of num_vehicles()
+                local_solution.routes.len()
             );
             csv_data.push(csv_row);
             
@@ -176,6 +201,110 @@ impl SolverRuntime {
                 writeln!(file, "{}", line).expect("Failed to write to comparison CSV file");
             }
             println!("Comparison results written to: {}", csv_filename);
+        }
+        
+        results
+    }
+
+    /// Extended comparison including all metaheuristics
+    pub fn run_metaheuristic_comparison(&self) -> Vec<(String, Solution, Solution, Solution, Solution)> {
+        let mut results = Vec::new();
+        let mut csv_data = Vec::new();
+        
+        // Create results directory structure based on instance size
+        if let Some(first_instance) = self.instances.first() {
+            let instance_size = first_instance.n_reqs().to_string();
+            let results_dir = format!("results/{}", instance_size);
+            fs::create_dir_all(&results_dir).expect("Failed to create results directory");
+            
+            // Add CSV header for metaheuristic comparison
+            csv_data.push("instance_name,vnd_time,vnd_objective,vnd_fairness,vnd_vehicles,grasp_time,grasp_objective,grasp_fairness,grasp_vehicles,sa_time,sa_objective,sa_fairness,sa_vehicles,local_time,local_objective,local_fairness,local_vehicles".to_string());
+        }
+        
+        let neighborhoods = vec![
+            Neighborhood::Relocate,
+            Neighborhood::Exchange,
+            Neighborhood::TwoOpt,
+        ];
+
+        for instance in &self.instances {
+            println!("Comparing metaheuristics for instance: {}", instance.name());
+            
+            // VND
+            let vnd_start = Instant::now();
+            let vnd_solver = VND::new(instance, neighborhoods.clone())
+                .with_max_iterations(100);
+            let vnd_solution = vnd_solver.solve();
+            let vnd_time = vnd_start.elapsed().as_secs_f64();
+            println!("  VND completed in {:.2}s, objective: {:.2}", vnd_time, vnd_solution.objective_function_value());
+            
+            // GRASP
+            let grasp_start = Instant::now();
+            let grasp_config = GRASPConfig::default();
+            let grasp_solver = GRASP::new(instance, grasp_config);
+            let grasp_solution = grasp_solver.solve();
+            let grasp_time = grasp_start.elapsed().as_secs_f64();
+            println!("  GRASP completed in {:.2}s, objective: {:.2}", grasp_time, grasp_solution.objective_function_value());
+            
+            // Simulated Annealing
+            let sa_start = Instant::now();
+            let sa_config = SimulatedAnnealingConfig::default();
+            let sa_solver = SimulatedAnnealing::new(instance, sa_config);
+            let sa_solution = sa_solver.solve();
+            let sa_time = sa_start.elapsed().as_secs_f64();
+            println!("  SA completed in {:.2}s, objective: {:.2}", sa_time, sa_solution.objective_function_value());
+            
+            // Local Search (baseline)
+            let local_start = Instant::now();
+            let local_solver = LocalSearch::new(instance, LocalSearchConfig::default());
+            let local_solution = local_solver.solve();
+            let local_time = local_start.elapsed().as_secs_f64();
+            println!("  Local Search completed in {:.2}s, objective: {:.2}", local_time, local_solution.objective_function_value());
+            
+            // Add CSV row for comparison
+            let csv_row = format!(
+                "{},{:.6},{:.6},{:.6},{},{:.6},{:.6},{:.6},{},{:.6},{:.6},{:.6},{},{:.6},{:.6},{:.6},{}",
+                instance.name(),
+                vnd_time,
+                vnd_solution.objective_function_value(),
+                vnd_solution.jain_fairness(),
+                vnd_solution.routes.len(),
+                grasp_time,
+                grasp_solution.objective_function_value(),
+                grasp_solution.jain_fairness(),
+                grasp_solution.routes.len(),
+                sa_time,
+                sa_solution.objective_function_value(),
+                sa_solution.jain_fairness(),
+                sa_solution.routes.len(),
+                local_time,
+                local_solution.objective_function_value(),
+                local_solution.jain_fairness(),
+                local_solution.routes.len()
+            );
+            csv_data.push(csv_row);
+            
+            results.push((
+                instance.name().to_string(),
+                vnd_solution,
+                grasp_solution,
+                sa_solution,
+                local_solution
+            ));
+            
+            println!();
+        }
+        
+        // Write comparison CSV file
+        if let Some(first_instance) = self.instances.first() {
+            let instance_size = first_instance.n_reqs().to_string();
+            let csv_filename = format!("results/{}/metaheuristic_comparison.csv", instance_size);
+            
+            let mut file = File::create(&csv_filename).expect("Failed to create metaheuristic comparison CSV file");
+            for line in csv_data {
+                writeln!(file, "{}", line).expect("Failed to write to comparison CSV file");
+            }
+            println!("Metaheuristic comparison results written to: {}", csv_filename);
         }
         
         results
